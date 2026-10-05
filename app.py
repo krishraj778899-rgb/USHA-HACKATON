@@ -1,38 +1,76 @@
 from flask import Flask, request, jsonify, send_from_directory
 import sqlite3
-from datetime import datetime
 import os
+from datetime import datetime
 
 app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_NAME = os.path.join(BASE_DIR, "carbonfarm.db")
+DB = os.path.join(BASE_DIR, "carbonfarm.db")
 
 
-# =========================================================
-# DATABASE
-# =========================================================
+# ================= DATABASE =================
 
-def get_db():
-    conn = sqlite3.connect(DB_NAME)
+def db():
+    conn = sqlite3.connect(DB)
     conn.row_factory = sqlite3.Row
     return conn
 
 
 def init_db():
-    conn = get_db()
+    conn = db()
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS farm_profiles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            farm_name TEXT,
+            location TEXT,
+            land_area REAL,
+            land_type TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS assessments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            farmer_name TEXT NOT NULL,
-            land_area REAL NOT NULL,
-            main_crop TEXT NOT NULL,
-            practice TEXT NOT NULL,
-            documents TEXT NOT NULL,
-            score INTEGER NOT NULL,
-            status TEXT NOT NULL,
-            summary TEXT NOT NULL,
+            user_id INTEGER,
+            farm_id INTEGER,
+
+            land_area REAL,
+            land_type TEXT,
+
+            crop_history TEXT,
+
+            farming_practices TEXT,
+
+            irrigation_source TEXT,
+            irrigation_method TEXT,
+
+            fertilizer_usage TEXT,
+            pesticide_usage TEXT,
+
+            soil_testing TEXT,
+            compost_usage TEXT,
+            crop_rotation TEXT,
+
+            documents TEXT,
+
+            score INTEGER,
+            status TEXT,
+            summary TEXT,
+
             created_at TEXT NOT NULL
         )
     """)
@@ -41,142 +79,149 @@ def init_db():
     conn.close()
 
 
-# =========================================================
-# ASSESSMENT ENGINE
-# =========================================================
+# ================= SCORE ENGINE =================
 
-def calculate_assessment(data):
+def calculate_score(data):
 
-    farmer_name = str(data.get("farmerName", "")).strip()
-    main_crop = str(data.get("mainCrop", "")).strip()
-    practice = str(data.get("practice", "")).strip()
-    documents = str(data.get("documents", "")).strip()
+    score = 0
+    breakdown = {}
 
-    try:
-        land_area = float(data.get("landArea", 0))
-    except (ValueError, TypeError):
-        land_area = 0
+    # 1. LAND - 15
+    land = float(data.get("landArea") or 0)
 
-    # Land
-    land_score = 20 if land_area > 0 else 0
+    if land > 0:
+        breakdown["land"] = 15
+        score += 15
+    else:
+        breakdown["land"] = 0
 
-    # Crop
-    crop_score = 15 if main_crop else 0
+    # 2. CROP HISTORY - 15
+    crop = data.get("cropHistory", "").strip()
 
-    # Farming practice
+    if crop:
+        breakdown["crop"] = 15
+        score += 15
+    else:
+        breakdown["crop"] = 0
+
+    # 3. FARMING PRACTICES - 20
+    practice = data.get("farmingPractices", "").strip()
+
     if practice == "multiple":
-        practice_score = 30
-    elif practice in ["organic", "water", "soil"]:
-        practice_score = 25
+        practice_score = 20
+    elif practice:
+        practice_score = 15
     else:
         practice_score = 0
 
-    # Documents
+    breakdown["practices"] = practice_score
+    score += practice_score
+
+    # 4. IRRIGATION - 10
+    irrigation = data.get("irrigationSource", "").strip()
+
+    if irrigation:
+        breakdown["irrigation"] = 10
+        score += 10
+    else:
+        breakdown["irrigation"] = 0
+
+    # 5. INPUT USAGE - 10
+    fertilizer = data.get("fertilizerUsage", "").strip()
+    pesticide = data.get("pesticideUsage", "").strip()
+
+    if fertilizer and pesticide:
+        input_score = 10
+    elif fertilizer or pesticide:
+        input_score = 5
+    else:
+        input_score = 0
+
+    breakdown["inputs"] = input_score
+    score += input_score
+
+    # 6. SOIL MANAGEMENT - 15
+    soil_test = data.get("soilTesting", "").strip()
+    compost = data.get("compostUsage", "").strip()
+    rotation = data.get("cropRotation", "").strip()
+
+    soil_score = 0
+
+    if soil_test:
+        soil_score += 5
+
+    if compost:
+        soil_score += 5
+
+    if rotation:
+        soil_score += 5
+
+    breakdown["soil"] = soil_score
+    score += soil_score
+
+    # 7. DOCUMENTS - 15
+    documents = data.get("documents", "").strip()
+
     if documents == "complete":
-        document_score = 35
+        document_score = 15
     elif documents == "partial":
-        document_score = 20
-    elif documents == "limited":
         document_score = 10
+    elif documents == "limited":
+        document_score = 5
     else:
         document_score = 0
 
-    score = min(
-        land_score +
-        crop_score +
-        practice_score +
-        document_score,
-        100
-    )
+    breakdown["documents"] = document_score
+    score += document_score
 
-    # Status
+    score = min(score, 100)
+
+    # STATUS
     if score >= 80:
         status = "🟢 Highly Ready"
-        summary = (
-            "Your farm shows strong readiness for "
-            "carbon credit assessment and documentation."
-        )
+        summary = "Your farm is highly ready for carbon credit assessment."
 
     elif score >= 60:
         status = "🟡 Moderately Ready"
-        summary = (
-            "Your farm has a good foundation, but some "
-            "improvements and additional evidence are recommended."
-        )
+        summary = "Your farm has a good foundation but needs some improvements."
 
     else:
         status = "🔴 Needs Improvement"
-        summary = (
-            "Your farm needs additional practices and "
-            "documentation before it is fully ready."
-        )
+        summary = "Your farm needs additional practices and documentation."
 
-    # Missing evidence
-    missing_evidence = []
-
-    if land_score == 0:
-        missing_evidence.append("Valid land information")
-
-    if crop_score == 0:
-        missing_evidence.append("Main crop information")
-
-    if practice_score == 0:
-        missing_evidence.append("Sustainable farming practice")
-
-    if document_score < 35:
-        missing_evidence.append("Complete supporting documents")
-
-    # Recommendations
+    # RECOMMENDATIONS
     recommendations = []
 
-    if practice_score < 30:
-        recommendations.append(
-            "Adopt more sustainable farming practices."
-        )
+    if breakdown["land"] == 0:
+        recommendations.append("Add valid land information.")
 
-    if document_score < 35:
-        recommendations.append(
-            "Maintain complete farm and practice documentation."
-        )
+    if breakdown["crop"] == 0:
+        recommendations.append("Add your crop cultivation history.")
 
-    if land_score == 0:
-        recommendations.append(
-            "Provide accurate land area information."
-        )
+    if breakdown["practices"] < 20:
+        recommendations.append("Adopt more sustainable farming practices.")
 
-    if crop_score == 0:
-        recommendations.append(
-            "Add the primary crop information."
-        )
+    if breakdown["irrigation"] == 0:
+        recommendations.append("Add irrigation and water management information.")
+
+    if breakdown["inputs"] < 10:
+        recommendations.append("Improve and document fertilizer and pesticide management.")
+
+    if breakdown["soil"] < 15:
+        recommendations.append("Improve soil testing, composting and crop rotation.")
+
+    if breakdown["documents"] < 15:
+        recommendations.append("Maintain complete supporting farm documents.")
 
     if not recommendations:
         recommendations.append(
-            "Continue maintaining sustainable practices and records."
+            "Continue maintaining sustainable farming practices and records."
         )
 
-    return {
-        "farmerName": farmer_name,
-        "landArea": land_area,
-        "mainCrop": main_crop,
-        "practice": practice,
-        "documents": documents,
-        "score": score,
-        "status": status,
-        "summary": summary,
-        "breakdown": {
-            "land": land_score,
-            "crop": crop_score,
-            "practice": practice_score,
-            "documents": document_score
-        },
-        "missingEvidence": missing_evidence,
-        "recommendations": recommendations
-    }
+    return score, status, summary, breakdown, recommendations
 
 
-# =========================================================
-# FRONTEND
-# =========================================================
+# ================= FRONTEND =================
 
 @app.route("/")
 def home():
@@ -193,114 +238,268 @@ def script():
     return send_from_directory(BASE_DIR, "script.js")
 
 
-# =========================================================
-# HEALTH
-# =========================================================
+@app.route("/admin.html")
+def admin():
+    return send_from_directory(BASE_DIR, "admin.html")
 
-@app.route("/api/health", methods=["GET"])
+
+@app.route("/admin.css")
+def admin_css():
+    return send_from_directory(BASE_DIR, "admin.css")
+
+
+# ================= HEALTH =================
+
+@app.route("/api/health")
 def health():
-
     return jsonify({
         "success": True,
-        "message": "CarbonFarm backend is running",
-        "status": "online"
+        "message": "CarbonFarm backend is running"
     })
 
 
-# =========================================================
-# CREATE ASSESSMENT
-# =========================================================
+# ================= REGISTER =================
 
-@app.route("/api/assessment", methods=["POST"])
-def create_assessment():
+@app.route("/api/register", methods=["POST"])
+def register():
+
+    data = request.get_json() or {}
+
+    name = data.get("name", "").strip()
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "").strip()
+
+    if not name or not email or not password:
+        return jsonify({
+            "success": False,
+            "message": "All fields are required."
+        }), 400
+
+    conn = db()
 
     try:
 
-        data = request.get_json()
-
-        if not data:
-            return jsonify({
-                "success": False,
-                "message": "No assessment data received"
-            }), 400
-
-        result = calculate_assessment(data)
-
-        if not result["farmerName"]:
-            return jsonify({
-                "success": False,
-                "message": "Farmer name is required"
-            }), 400
-
-        if result["landArea"] <= 0:
-            return jsonify({
-                "success": False,
-                "message": "Valid land area is required"
-            }), 400
-
-        if not result["mainCrop"]:
-            return jsonify({
-                "success": False,
-                "message": "Main crop is required"
-            }), 400
-
-        conn = get_db()
-
         cursor = conn.execute("""
-            INSERT INTO assessments (
-                farmer_name,
-                land_area,
-                main_crop,
-                practice,
-                documents,
-                score,
-                status,
-                summary,
-                created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO users
+            (name, email, password, created_at)
+            VALUES (?, ?, ?, ?)
         """, (
-            result["farmerName"],
-            result["landArea"],
-            result["mainCrop"],
-            result["practice"],
-            result["documents"],
-            result["score"],
-            result["status"],
-            result["summary"],
+            name,
+            email,
+            password,
             datetime.now().isoformat()
         ))
 
-        assessment_id = cursor.lastrowid
-
         conn.commit()
-        conn.close()
 
-        result["assessmentId"] = assessment_id
+        user_id = cursor.lastrowid
 
         return jsonify({
             "success": True,
-            "message": "Assessment completed successfully",
-            "assessment": result
-        }), 201
+            "message": "Registration successful",
+            "userId": user_id
+        })
 
-    except Exception as e:
+    except sqlite3.IntegrityError:
 
         return jsonify({
             "success": False,
-            "message": "Assessment failed",
-            "error": str(e)
-        }), 500
+            "message": "Email already registered."
+        }), 409
+
+    finally:
+        conn.close()
 
 
-# =========================================================
-# GET SINGLE ASSESSMENT
-# =========================================================
+# ================= LOGIN =================
 
-@app.route("/api/assessment/<int:assessment_id>", methods=["GET"])
+@app.route("/api/login", methods=["POST"])
+def login():
+
+    data = request.get_json() or {}
+
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "").strip()
+
+    conn = db()
+
+    user = conn.execute("""
+        SELECT *
+        FROM users
+        WHERE email = ? AND password = ?
+    """, (
+        email,
+        password
+    )).fetchone()
+
+    conn.close()
+
+    if not user:
+
+        return jsonify({
+            "success": False,
+            "message": "Invalid email or password."
+        }), 401
+
+    return jsonify({
+        "success": True,
+        "message": "Login successful",
+        "user": {
+            "id": user["id"],
+            "name": user["name"],
+            "email": user["email"]
+        }
+    })
+
+
+# ================= FARM PROFILE =================
+
+@app.route("/api/farm-profile", methods=["POST"])
+def farm_profile():
+
+    data = request.get_json() or {}
+
+    user_id = data.get("userId")
+
+    if not user_id:
+        return jsonify({
+            "success": False,
+            "message": "User ID required."
+        }), 400
+
+    conn = db()
+
+    cursor = conn.execute("""
+        INSERT INTO farm_profiles
+        (
+            user_id,
+            farm_name,
+            location,
+            land_area,
+            land_type,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        user_id,
+        data.get("farmName", ""),
+        data.get("location", ""),
+        data.get("landArea", 0),
+        data.get("landType", ""),
+        datetime.now().isoformat()
+    ))
+
+    conn.commit()
+
+    farm_id = cursor.lastrowid
+
+    conn.close()
+
+    return jsonify({
+        "success": True,
+        "message": "Farm profile saved",
+        "farmId": farm_id
+    })
+
+
+# ================= START ASSESSMENT =================
+
+@app.route("/api/assessment", methods=["POST"])
+def assessment():
+
+    data = request.get_json() or {}
+
+    score, status, summary, breakdown, recommendations = \
+        calculate_score(data)
+
+    conn = db()
+
+    cursor = conn.execute("""
+        INSERT INTO assessments
+        (
+            user_id,
+            farm_id,
+            land_area,
+            land_type,
+            crop_history,
+            farming_practices,
+            irrigation_source,
+            irrigation_method,
+            fertilizer_usage,
+            pesticide_usage,
+            soil_testing,
+            compost_usage,
+            crop_rotation,
+            documents,
+            score,
+            status,
+            summary,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+
+        data.get("userId"),
+
+        data.get("farmId"),
+
+        data.get("landArea", 0),
+
+        data.get("landType", ""),
+
+        data.get("cropHistory", ""),
+
+        data.get("farmingPractices", ""),
+
+        data.get("irrigationSource", ""),
+
+        data.get("irrigationMethod", ""),
+
+        data.get("fertilizerUsage", ""),
+
+        data.get("pesticideUsage", ""),
+
+        data.get("soilTesting", ""),
+
+        data.get("compostUsage", ""),
+
+        data.get("cropRotation", ""),
+
+        data.get("documents", ""),
+
+        score,
+
+        status,
+
+        summary,
+
+        datetime.now().isoformat()
+    ))
+
+    assessment_id = cursor.lastrowid
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "success": True,
+        "assessment": {
+            "assessmentId": assessment_id,
+            "score": score,
+            "status": status,
+            "summary": summary,
+            "breakdown": breakdown,
+            "recommendations": recommendations
+        }
+    })
+
+
+# ================= GET ASSESSMENT =================
+
+@app.route("/api/assessment/<int:assessment_id>")
 def get_assessment(assessment_id):
 
-    conn = get_db()
+    conn = db()
 
     row = conn.execute("""
         SELECT *
@@ -318,98 +517,36 @@ def get_assessment(assessment_id):
 
     return jsonify({
         "success": True,
-        "assessment": {
-            "assessmentId": row["id"],
-            "farmerName": row["farmer_name"],
-            "landArea": row["land_area"],
-            "mainCrop": row["main_crop"],
-            "practice": row["practice"],
-            "documents": row["documents"],
-            "score": row["score"],
-            "status": row["status"],
-            "summary": row["summary"],
-            "createdAt": row["created_at"]
-        }
+        "assessment": dict(row)
     })
 
 
-# =========================================================
-# ADMIN - ALL ASSESSMENTS
-# =========================================================
+# ================= ADMIN STATS =================
 
-@app.route("/api/admin/assessments", methods=["GET"])
-def admin_assessments():
-
-    conn = get_db()
-
-    rows = conn.execute("""
-        SELECT *
-        FROM assessments
-        ORDER BY id DESC
-    """).fetchall()
-
-    conn.close()
-
-    assessments = []
-
-    for row in rows:
-
-        assessments.append({
-            "id": row["id"],
-            "farmerName": row["farmer_name"],
-            "landArea": row["land_area"],
-            "mainCrop": row["main_crop"],
-            "practice": row["practice"],
-            "documents": row["documents"],
-            "score": row["score"],
-            "status": row["status"],
-            "summary": row["summary"],
-            "createdAt": row["created_at"]
-        })
-
-    return jsonify({
-        "success": True,
-        "count": len(assessments),
-        "assessments": assessments
-    })
-
-
-# =========================================================
-# ADMIN - DASHBOARD STATISTICS
-# =========================================================
-
-@app.route("/api/admin/stats", methods=["GET"])
+@app.route("/api/admin/stats")
 def admin_stats():
 
-    conn = get_db()
+    conn = db()
 
-    total = conn.execute("""
-        SELECT COUNT(*) AS total
-        FROM assessments
-    """).fetchone()["total"]
+    total = conn.execute(
+        "SELECT COUNT(*) FROM assessments"
+    ).fetchone()[0]
 
-    highly_ready = conn.execute("""
-        SELECT COUNT(*) AS total
-        FROM assessments
-        WHERE score >= 80
-    """).fetchone()["total"]
+    highly = conn.execute(
+        "SELECT COUNT(*) FROM assessments WHERE score >= 80"
+    ).fetchone()[0]
 
-    moderately_ready = conn.execute("""
-        SELECT COUNT(*) AS total
-        FROM assessments
-        WHERE score >= 60 AND score < 80
-    """).fetchone()["total"]
+    moderate = conn.execute(
+        "SELECT COUNT(*) FROM assessments WHERE score >= 60 AND score < 80"
+    ).fetchone()[0]
 
-    needs_improvement = conn.execute("""
-        SELECT COUNT(*) AS total
-        FROM assessments
-        WHERE score < 60
-    """).fetchone()["total"]
+    improve = conn.execute(
+        "SELECT COUNT(*) FROM assessments WHERE score < 60"
+    ).fetchone()[0]
 
-    average_score = conn.execute("""
-        SELECT AVG(score) AS average
-        FROM assessments
-    """).fetchone()["average"]
+    average = conn.execute(
+        "SELECT AVG(score) FROM assessments"
+    ).fetchone()[0]
 
     conn.close()
 
@@ -417,80 +554,581 @@ def admin_stats():
         "success": True,
         "stats": {
             "totalAssessments": total,
-            "highlyReady": highly_ready,
-            "moderatelyReady": moderately_ready,
-            "needsImprovement": needs_improvement,
-            "averageScore": round(average_score or 0, 1)
+            "highlyReady": highly,
+            "moderatelyReady": moderate,
+            "needsImprovement": improve,
+            "averageScore": round(average or 0, 1)
         }
     })
 
 
-# =========================================================
-# ADMIN - RECENT ASSESSMENTS
-# =========================================================
+# ================= ADMIN ASSESSMENTS =================
 
-@app.route("/api/admin/recent", methods=["GET"])
-def admin_recent():
+@app.route("/api/admin/assessments")
+def admin_assessments():
 
-    conn = get_db()
+    conn = db()
 
     rows = conn.execute("""
         SELECT
             id,
-            farmer_name,
+            user_id,
+            farm_id,
             land_area,
-            main_crop,
+            crop_history,
+            farming_practices,
+            irrigation_source,
+            fertilizer_usage,
+            pesticide_usage,
+            soil_testing,
+            compost_usage,
+            crop_rotation,
+            documents,
             score,
             status,
+            summary,
             created_at
         FROM assessments
         ORDER BY id DESC
-        LIMIT 10
     """).fetchall()
 
     conn.close()
 
-    data = []
-
-    for row in rows:
-
-        data.append({
-            "id": row["id"],
-            "farmerName": row["farmer_name"],
-            "landArea": row["land_area"],
-            "mainCrop": row["main_crop"],
-            "score": row["score"],
-            "status": row["status"],
-            "createdAt": row["created_at"]
-        })
-
     return jsonify({
         "success": True,
-        "assessments": data
+        "assessments": [dict(row) for row in rows]
     })
 
 
-# =========================================================
-# ADMIN - DELETE ASSESSMENT
-# =========================================================
+# ================= RUN =================
 
-@app.route("/api/admin/assessment/<int:assessment_id>", methods=["DELETE"])
-def delete_assessment(assessment_id):
+if __name__ == "__main__":
 
-    conn = get_db()
+    init_db()
 
-    cursor = conn.execute("""
-        DELETE FROM assessments
-        WHERE id = ?
-    """, (assessment_id,))
+    print("\n================================")
+    print("🌱 CARBONFARM")
+    print("================================")
+    print("Server: http://127.0.0.1:5000")
+    print("================================\n")
+
+    app.run(
+        host="0.0.0.0",
+        port=5000,
+        debug=True
+    )
+    from flask import Flask, request, jsonify, send_from_directory
+import sqlite3
+import os
+from datetime import datetime
+
+app = Flask(__name__)
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB = os.path.join(BASE_DIR, "carbonfarm.db")
+
+
+# ================= DATABASE =================
+
+def db():
+    conn = sqlite3.connect(DB)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    conn = db()
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS farm_profiles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            farm_name TEXT,
+            location TEXT,
+            land_area REAL,
+            land_type TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS assessments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            farm_id INTEGER,
+
+            land_area REAL,
+            land_type TEXT,
+
+            crop_history TEXT,
+
+            farming_practices TEXT,
+
+            irrigation_source TEXT,
+            irrigation_method TEXT,
+
+            fertilizer_usage TEXT,
+            pesticide_usage TEXT,
+
+            soil_testing TEXT,
+            compost_usage TEXT,
+            crop_rotation TEXT,
+
+            documents TEXT,
+
+            score INTEGER,
+            status TEXT,
+            summary TEXT,
+
+            created_at TEXT NOT NULL
+        )
+    """)
 
     conn.commit()
+    conn.close()
 
-    deleted = cursor.rowcount
+
+# ================= SCORE ENGINE =================
+
+def calculate_score(data):
+
+    score = 0
+    breakdown = {}
+
+    # 1. LAND - 15
+    land = float(data.get("landArea") or 0)
+
+    if land > 0:
+        breakdown["land"] = 15
+        score += 15
+    else:
+        breakdown["land"] = 0
+
+    # 2. CROP HISTORY - 15
+    crop = data.get("cropHistory", "").strip()
+
+    if crop:
+        breakdown["crop"] = 15
+        score += 15
+    else:
+        breakdown["crop"] = 0
+
+    # 3. FARMING PRACTICES - 20
+    practice = data.get("farmingPractices", "").strip()
+
+    if practice == "multiple":
+        practice_score = 20
+    elif practice:
+        practice_score = 15
+    else:
+        practice_score = 0
+
+    breakdown["practices"] = practice_score
+    score += practice_score
+
+    # 4. IRRIGATION - 10
+    irrigation = data.get("irrigationSource", "").strip()
+
+    if irrigation:
+        breakdown["irrigation"] = 10
+        score += 10
+    else:
+        breakdown["irrigation"] = 0
+
+    # 5. INPUT USAGE - 10
+    fertilizer = data.get("fertilizerUsage", "").strip()
+    pesticide = data.get("pesticideUsage", "").strip()
+
+    if fertilizer and pesticide:
+        input_score = 10
+    elif fertilizer or pesticide:
+        input_score = 5
+    else:
+        input_score = 0
+
+    breakdown["inputs"] = input_score
+    score += input_score
+
+    # 6. SOIL MANAGEMENT - 15
+    soil_test = data.get("soilTesting", "").strip()
+    compost = data.get("compostUsage", "").strip()
+    rotation = data.get("cropRotation", "").strip()
+
+    soil_score = 0
+
+    if soil_test:
+        soil_score += 5
+
+    if compost:
+        soil_score += 5
+
+    if rotation:
+        soil_score += 5
+
+    breakdown["soil"] = soil_score
+    score += soil_score
+
+    # 7. DOCUMENTS - 15
+    documents = data.get("documents", "").strip()
+
+    if documents == "complete":
+        document_score = 15
+    elif documents == "partial":
+        document_score = 10
+    elif documents == "limited":
+        document_score = 5
+    else:
+        document_score = 0
+
+    breakdown["documents"] = document_score
+    score += document_score
+
+    score = min(score, 100)
+
+    # STATUS
+    if score >= 80:
+        status = "🟢 Highly Ready"
+        summary = "Your farm is highly ready for carbon credit assessment."
+
+    elif score >= 60:
+        status = "🟡 Moderately Ready"
+        summary = "Your farm has a good foundation but needs some improvements."
+
+    else:
+        status = "🔴 Needs Improvement"
+        summary = "Your farm needs additional practices and documentation."
+
+    # RECOMMENDATIONS
+    recommendations = []
+
+    if breakdown["land"] == 0:
+        recommendations.append("Add valid land information.")
+
+    if breakdown["crop"] == 0:
+        recommendations.append("Add your crop cultivation history.")
+
+    if breakdown["practices"] < 20:
+        recommendations.append("Adopt more sustainable farming practices.")
+
+    if breakdown["irrigation"] == 0:
+        recommendations.append("Add irrigation and water management information.")
+
+    if breakdown["inputs"] < 10:
+        recommendations.append("Improve and document fertilizer and pesticide management.")
+
+    if breakdown["soil"] < 15:
+        recommendations.append("Improve soil testing, composting and crop rotation.")
+
+    if breakdown["documents"] < 15:
+        recommendations.append("Maintain complete supporting farm documents.")
+
+    if not recommendations:
+        recommendations.append(
+            "Continue maintaining sustainable farming practices and records."
+        )
+
+    return score, status, summary, breakdown, recommendations
+
+
+# ================= FRONTEND =================
+
+@app.route("/")
+def home():
+    return send_from_directory(BASE_DIR, "index.html")
+
+
+@app.route("/style.css")
+def style():
+    return send_from_directory(BASE_DIR, "style.css")
+
+
+@app.route("/script.js")
+def script():
+    return send_from_directory(BASE_DIR, "script.js")
+
+
+@app.route("/admin.html")
+def admin():
+    return send_from_directory(BASE_DIR, "admin.html")
+
+
+@app.route("/admin.css")
+def admin_css():
+    return send_from_directory(BASE_DIR, "admin.css")
+
+
+# ================= HEALTH =================
+
+@app.route("/api/health")
+def health():
+    return jsonify({
+        "success": True,
+        "message": "CarbonFarm backend is running"
+    })
+
+
+# ================= REGISTER =================
+
+@app.route("/api/register", methods=["POST"])
+def register():
+
+    data = request.get_json() or {}
+
+    name = data.get("name", "").strip()
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "").strip()
+
+    if not name or not email or not password:
+        return jsonify({
+            "success": False,
+            "message": "All fields are required."
+        }), 400
+
+    conn = db()
+
+    try:
+
+        cursor = conn.execute("""
+            INSERT INTO users
+            (name, email, password, created_at)
+            VALUES (?, ?, ?, ?)
+        """, (
+            name,
+            email,
+            password,
+            datetime.now().isoformat()
+        ))
+
+        conn.commit()
+
+        user_id = cursor.lastrowid
+
+        return jsonify({
+            "success": True,
+            "message": "Registration successful",
+            "userId": user_id
+        })
+
+    except sqlite3.IntegrityError:
+
+        return jsonify({
+            "success": False,
+            "message": "Email already registered."
+        }), 409
+
+    finally:
+        conn.close()
+
+
+# ================= LOGIN =================
+
+@app.route("/api/login", methods=["POST"])
+def login():
+
+    data = request.get_json() or {}
+
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "").strip()
+
+    conn = db()
+
+    user = conn.execute("""
+        SELECT *
+        FROM users
+        WHERE email = ? AND password = ?
+    """, (
+        email,
+        password
+    )).fetchone()
 
     conn.close()
 
-    if deleted == 0:
+    if not user:
+
+        return jsonify({
+            "success": False,
+            "message": "Invalid email or password."
+        }), 401
+
+    return jsonify({
+        "success": True,
+        "message": "Login successful",
+        "user": {
+            "id": user["id"],
+            "name": user["name"],
+            "email": user["email"]
+        }
+    })
+
+
+# ================= FARM PROFILE =================
+
+@app.route("/api/farm-profile", methods=["POST"])
+def farm_profile():
+
+    data = request.get_json() or {}
+
+    user_id = data.get("userId")
+
+    if not user_id:
+        return jsonify({
+            "success": False,
+            "message": "User ID required."
+        }), 400
+
+    conn = db()
+
+    cursor = conn.execute("""
+        INSERT INTO farm_profiles
+        (
+            user_id,
+            farm_name,
+            location,
+            land_area,
+            land_type,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        user_id,
+        data.get("farmName", ""),
+        data.get("location", ""),
+        data.get("landArea", 0),
+        data.get("landType", ""),
+        datetime.now().isoformat()
+    ))
+
+    conn.commit()
+
+    farm_id = cursor.lastrowid
+
+    conn.close()
+
+    return jsonify({
+        "success": True,
+        "message": "Farm profile saved",
+        "farmId": farm_id
+    })
+
+
+# ================= START ASSESSMENT =================
+
+@app.route("/api/assessment", methods=["POST"])
+def assessment():
+
+    data = request.get_json() or {}
+
+    score, status, summary, breakdown, recommendations = \
+        calculate_score(data)
+
+    conn = db()
+
+    cursor = conn.execute("""
+        INSERT INTO assessments
+        (
+            user_id,
+            farm_id,
+            land_area,
+            land_type,
+            crop_history,
+            farming_practices,
+            irrigation_source,
+            irrigation_method,
+            fertilizer_usage,
+            pesticide_usage,
+            soil_testing,
+            compost_usage,
+            crop_rotation,
+            documents,
+            score,
+            status,
+            summary,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+
+        data.get("userId"),
+
+        data.get("farmId"),
+
+        data.get("landArea", 0),
+
+        data.get("landType", ""),
+
+        data.get("cropHistory", ""),
+
+        data.get("farmingPractices", ""),
+
+        data.get("irrigationSource", ""),
+
+        data.get("irrigationMethod", ""),
+
+        data.get("fertilizerUsage", ""),
+
+        data.get("pesticideUsage", ""),
+
+        data.get("soilTesting", ""),
+
+        data.get("compostUsage", ""),
+
+        data.get("cropRotation", ""),
+
+        data.get("documents", ""),
+
+        score,
+
+        status,
+
+        summary,
+
+        datetime.now().isoformat()
+    ))
+
+    assessment_id = cursor.lastrowid
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "success": True,
+        "assessment": {
+            "assessmentId": assessment_id,
+            "score": score,
+            "status": status,
+            "summary": summary,
+            "breakdown": breakdown,
+            "recommendations": recommendations
+        }
+    })
+
+
+# ================= GET ASSESSMENT =================
+
+@app.route("/api/assessment/<int:assessment_id>")
+def get_assessment(assessment_id):
+
+    conn = db()
+
+    row = conn.execute("""
+        SELECT *
+        FROM assessments
+        WHERE id = ?
+    """, (assessment_id,)).fetchone()
+
+    conn.close()
+
+    if not row:
         return jsonify({
             "success": False,
             "message": "Assessment not found"
@@ -498,27 +1136,100 @@ def delete_assessment(assessment_id):
 
     return jsonify({
         "success": True,
-        "message": "Assessment deleted successfully"
+        "assessment": dict(row)
     })
 
 
-# =========================================================
-# RUN
-# =========================================================
+# ================= ADMIN STATS =================
+
+@app.route("/api/admin/stats")
+def admin_stats():
+
+    conn = db()
+
+    total = conn.execute(
+        "SELECT COUNT(*) FROM assessments"
+    ).fetchone()[0]
+
+    highly = conn.execute(
+        "SELECT COUNT(*) FROM assessments WHERE score >= 80"
+    ).fetchone()[0]
+
+    moderate = conn.execute(
+        "SELECT COUNT(*) FROM assessments WHERE score >= 60 AND score < 80"
+    ).fetchone()[0]
+
+    improve = conn.execute(
+        "SELECT COUNT(*) FROM assessments WHERE score < 60"
+    ).fetchone()[0]
+
+    average = conn.execute(
+        "SELECT AVG(score) FROM assessments"
+    ).fetchone()[0]
+
+    conn.close()
+
+    return jsonify({
+        "success": True,
+        "stats": {
+            "totalAssessments": total,
+            "highlyReady": highly,
+            "moderatelyReady": moderate,
+            "needsImprovement": improve,
+            "averageScore": round(average or 0, 1)
+        }
+    })
+
+
+# ================= ADMIN ASSESSMENTS =================
+
+@app.route("/api/admin/assessments")
+def admin_assessments():
+
+    conn = db()
+
+    rows = conn.execute("""
+        SELECT
+            id,
+            user_id,
+            farm_id,
+            land_area,
+            crop_history,
+            farming_practices,
+            irrigation_source,
+            fertilizer_usage,
+            pesticide_usage,
+            soil_testing,
+            compost_usage,
+            crop_rotation,
+            documents,
+            score,
+            status,
+            summary,
+            created_at
+        FROM assessments
+        ORDER BY id DESC
+    """).fetchall()
+
+    conn.close()
+
+    return jsonify({
+        "success": True,
+        "assessments": [dict(row) for row in rows]
+    })
+
+
+# ================= RUN =================
 
 if __name__ == "__main__":
 
     init_db()
 
-    print("")
-    print("========================================")
-    print("        🌱 CARBONFARM BACKEND")
-    print("========================================")
-    print("Server : http://127.0.0.1:5000")
-    print("Health : http://127.0.0.1:5000/api/health")
-    print("Admin  : /api/admin/stats")
-    print("========================================")
-    print("")
+    print("\n================================")
+    print("🌱 CARBONFARM")
+    print("================================")
+    print("Server: http://127.0.0.1:5000")
+    print("================================\n")
 
     app.run(
         host="0.0.0.0",
