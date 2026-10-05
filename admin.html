@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>CarbonFarm Admin Dashboard</title>
+
+    <link rel="stylesheet" href="./admin.css">
+</head>
+
+<body>
+
+    <!-- =========================
+         SIDEBAR
+    ========================== -->
+
+    <aside class="sidebar">
+
+        <div class="brand">
+            <div class="brand-icon">🌱</div>
+
+            <div>
+                <h2>CarbonFarm</h2>
+                <span>Admin Panel</span>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+
+            <a href="#dashboard" class="nav-item active">
+                <span>📊</span>
+                Dashboard
+            </a>
+
+            <a href="#assessments" class="nav-item">
+                <span>📋</span>
+                Assessments
+            </a>
+
+            <a href="#overview" class="nav-item">
+                <span>📈</span>
+                Overview
+            </a>
+
+        </nav>
+
+        <div class="sidebar-bottom">
+
+            <a href="/" class="back-home">
+                <span>←</span>
+                Back to Website
+            </a>
+
+        </div>
+
+    </aside>
+
+
+    <!-- =========================
+         MAIN CONTENT
+    ========================== -->
+
+    <main class="main-content">
+
+        <!-- TOPBAR -->
+
+        <header class="topbar">
+
+            <div>
+                <p class="topbar-label">CARBON CREDIT PLATFORM</p>
+
+                <h1>Admin Dashboard</h1>
+
+                <p class="topbar-subtitle">
+                    Monitor farmer carbon readiness assessments.
+                </p>
+            </div>
+
+            <div class="admin-profile">
+
+                <div class="profile-icon">
+                    A
+                </div>
+
+                <div>
+                    <strong>Administrator</strong>
+                    <span>System Admin</span>
+                </div>
+
+            </div>
+
+        </header>
+
+
+        <!-- =========================
+             DASHBOARD
+        ========================== -->
+
+        <section id="dashboard">
+
+            <div class="section-heading">
+
+                <div>
+                    <span class="section-tag">OVERVIEW</span>
+
+                    <h2>Platform Statistics</h2>
+                </div>
+
+                <button
+                    class="refresh-btn"
+                    id="refreshBtn"
+                    type="button"
+                >
+                    ↻ Refresh
+                </button>
+
+            </div>
+
+
+            <!-- STAT CARDS -->
+
+            <div class="stats-grid">
+
+                <div class="stat-card">
+
+                    <div class="stat-icon green">
+                        📊
+                    </div>
+
+                    <div class="stat-info">
+
+                        <span>Total Assessments</span>
+
+                        <strong id="totalAssessments">
+                            0
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <div class="stat-card">
+
+                    <div class="stat-icon highly">
+                        ✓
+                    </div>
+
+                    <div class="stat-info">
+
+                        <span>Highly Ready</span>
+
+                        <strong id="highlyReady">
+                            0
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <div class="stat-card">
+
+                    <div class="stat-icon moderate">
+                        ◐
+                    </div>
+
+                    <div class="stat-info">
+
+                        <span>Moderately Ready</span>
+
+                        <strong id="moderatelyReady">
+                            0
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <div class="stat-card">
+
+                    <div class="stat-icon improve">
+                        !
+                    </div>
+
+                    <div class="stat-info">
+
+                        <span>Needs Improvement</span>
+
+                        <strong id="needsImprovement">
+                            0
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <div class="stat-card average-card">
+
+                    <div class="stat-icon blue">
+                        %
+                    </div>
+
+                    <div class="stat-info">
+
+                        <span>Average Score</span>
+
+                        <strong>
+                            <span id="averageScore">0</span>
+                            <small>/100</small>
+                        </strong>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =========================
+             READINESS OVERVIEW
+        ========================== -->
+
+        <section id="overview" class="overview-section">
+
+            <div class="section-heading">
+
+                <div>
+                    <span class="section-tag">READINESS</span>
+
+                    <h2>Assessment Distribution</h2>
+                </div>
+
+            </div>
+
+
+            <div class="overview-grid">
+
+                <!-- Chart -->
+
+                <div class="overview-card">
+
+                    <div class="overview-card-header">
+
+                        <div>
+                            <h3>Readiness Status</h3>
+                            <p>Current assessment distribution</p>
+                        </div>
+
+                    </div>
+
+                    <div class="status-chart">
+
+                        <div class="donut">
+
+                            <div class="donut-center">
+
+                                <strong id="chartTotal">
+                                    0
+                                </strong>
+
+                                <span>Total</span>
+
+                            </div>
+
+                        </div>
+
+                        <div class="chart-legend">
+
+                            <div class="legend-item">
+                                <span class="legend-dot highly-dot"></span>
+
+                                <div>
+                                    <strong id="legendHighly">
+                                        0
+                                    </strong>
+
+                                    <span>Highly Ready</span>
+                                </div>
+                            </div>
+
+
+                            <div class="legend-item">
+                                <span class="legend-dot moderate-dot"></span>
+
+                                <div>
+                                    <strong id="legendModerate">
+                                        0
+                                    </strong>
+
+                                    <span>Moderately Ready</span>
+                                </div>
+                            </div>
+
+
+                            <div class="legend-item">
+                                <span class="legend-dot improve-dot"></span>
+
+                                <div>
+                                    <strong id="legendImprove">
+                                        0
+                                    </strong>
+
+                                    <span>Needs Improvement</span>
+                                </div>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- System Info -->
+
+                <div class="overview-card system-card">
+
+                    <div class="overview-card-header">
+
+                        <div>
+                            <h3>System Status</h3>
+                            <p>CarbonFarm platform health</p>
+                        </div>
+
+                        <span
+                            class="online-badge"
+                            id="systemStatus"
+                        >
+                            ● Online
+                        </span>
+
+                    </div>
+
+
+                    <div class="system-list">
+
+                        <div class="system-row">
+
+                            <span>Backend API</span>
+
+                            <strong class="status-online">
+                                Online
+                            </strong>
+
+                        </div>
+
+
+                        <div class="system-row">
+
+                            <span>Database</span>
+
+                            <strong class="status-online">
+                                Connected
+                            </strong>
+
+                        </div>
+
+
+                        <div class="system-row">
+
+                            <span>Assessment Engine</span>
+
+                            <strong class="status-online">
+                                Active
+                            </strong>
+
+                        </div>
+
+
+                        <div class="system-row">
+
+                            <span>Last Updated</span>
+
+                            <strong id="lastUpdated">
+                                —
+                            </strong>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =========================
+             ASSESSMENTS
+        ========================== -->
+
+        <section
+            id="assessments"
+            class="assessments-section"
+        >
+
+            <div class="section-heading">
+
+                <div>
+                    <span class="section-tag">FARMERS</span>
+
+                    <h2>Recent Assessments</h2>
+
+                    <p class="section-description">
+                        Latest farmer carbon readiness assessments.
+                    </p>
+                </div>
+
+            </div>
+
+
+            <!-- SEARCH -->
+
+            <div class="table-tools">
+
+                <div class="search-box">
+
+                    <span>⌕</span>
+
+                    <input
+                        type="text"
+                        id="searchInput"
+                        placeholder="Search farmer or crop..."
+                    >
+
+                </div>
+
+                <button
+                    class="refresh-btn"
+                    id="refreshTableBtn"
+                    type="button"
+                >
+                    ↻ Refresh
+                </button>
+
+            </div>
+
+
+            <!-- TABLE -->
+
+            <div class="table-wrapper">
+
+                <table>
+
+                    <thead>
+
+                        <tr>
+
+                            <th>ID</th>
+
+                            <th>Farmer</th>
+
+                            <th>Land</th>
+
+                            <th>Crop</th>
+
+                            <th>Score</th>
+
+                            <th>Status</th>
+
+                            <th>Date</th>
+
+                            <th>Action</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody id="assessmentTable">
+
+                        <tr>
+
+                            <td
+                                colspan="8"
+                                class="loading-cell"
+                            >
+                                Loading assessments...
+                            </td>
+
+                        </tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+        <!-- =========================
+             DETAILS MODAL
+        ========================== -->
+
+        <div
+            class="modal"
+            id="detailsModal"
+            aria-hidden="true"
+        >
+
+            <div class="modal-overlay" id="modalOverlay"></div>
+
+            <div class="modal-box">
+
+                <div class="modal-header">
+
+                    <div>
+                        <span class="section-tag">
+                            ASSESSMENT DETAILS
+                        </span>
+
+                        <h2 id="modalTitle">
+                            Farmer Assessment
+                        </h2>
+                    </div>
+
+                    <button
+                        class="modal-close"
+                        id="modalClose"
+                        type="button"
+                    >
+                        ×
+                    </button>
+
+                </div>
+
+
+                <div
+                    class="modal-content"
+                    id="modalContent"
+                >
+                    Loading...
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- =========================
+             FOOTER
+        ========================== -->
+
+        <footer class="admin-footer">
+
+            <div>
+                🌱 <strong>CarbonFarm</strong>
+                — Farmer Carbon Credit Readiness Platform
+            </div>
+
+            <span>
+                Admin Dashboard
+            </span>
+
+        </footer>
+
+    </main>
+
+
+    <!-- =========================
+         ADMIN JAVASCRIPT
+    ========================== -->
+
+    <script>
+
+        const API_BASE = "/api";
+
+        let allAssessments = [];
+
+
+        /* =================================================
+           HELPERS
+        ================================================= */
+
+        function $(id) {
+            return document.getElementById(id);
+        }
+
+
+        function escapeHTML(value) {
+
+            const div = document.createElement("div");
+
+            div.textContent = value ?? "";
+
+            return div.innerHTML;
+        }
+
+
+        function formatDate(dateString) {
+
+            if (!dateString) return "—";
+
+            const date = new Date(dateString);
+
+            if (Number.isNaN(date.getTime())) {
+                return dateString;
+            }
+
+            return date.toLocaleDateString("en-IN", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric"
+            });
+        }
+
+
+        /* =================================================
+           LOAD STATISTICS
+        ================================================= */
+
+        async function loadStats() {
+
+            try {
+
+                const response =
+                    await fetch(`${API_BASE}/admin/stats`);
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error("Unable to load statistics");
+                }
+
+                const stats = data.stats;
+
+
+                $("totalAssessments").textContent =
+                    stats.totalAssessments;
+
+                $("highlyReady").textContent =
+                    stats.highlyReady;
+
+                $("moderatelyReady").textContent =
+                    stats.moderatelyReady;
+
+                $("needsImprovement").textContent =
+                    stats.needsImprovement;
+
+                $("averageScore").textContent =
+                    stats.averageScore;
+
+
+                $("chartTotal").textContent =
+                    stats.totalAssessments;
+
+                $("legendHighly").textContent =
+                    stats.highlyReady;
+
+                $("legendModerate").textContent =
+                    stats.moderatelyReady;
+
+                $("legendImprove").textContent =
+                    stats.needsImprovement;
+
+
+                updateDonut(stats);
+
+                $("lastUpdated").textContent =
+                    new Date().toLocaleTimeString("en-IN", {
+                        hour: "2-digit",
+                        minute: "2-digit"
+                    });
+
+
+            } catch (error) {
+
+                console.error(
+                    "Stats error:",
+                    error
+                );
+
+                $("systemStatus").textContent =
+                    "● Offline";
+
+                $("systemStatus").classList.add("offline");
+            }
+        }
+
+
+        /* =================================================
+           DONUT CHART
+        ================================================= */
+
+        function updateDonut(stats) {
+
+            const total =
+                stats.totalAssessments;
+
+            if (total === 0) {
+
+                document.querySelector(".donut").style.background =
+                    "conic-gradient(#e8eee9 0deg 360deg)";
+
+                return;
+            }
+
+
+            const highly =
+                (stats.highlyReady / total) * 360;
+
+            const moderate =
+                (stats.moderatelyReady / total) * 360;
+
+            const improve =
+                (stats.needsImprovement / total) * 360;
+
+
+            document.querySelector(".donut").style.background = `
+                conic-gradient(
+                    #238636 0deg ${highly}deg,
+                    #d89b00 ${highly}deg ${highly + moderate}deg,
+                    #d94b4b ${highly + moderate}deg 360deg
+                )
+            `;
+        }
+
+
+        /* =================================================
+           LOAD ASSESSMENTS
+        ================================================= */
+
+        async function loadAssessments() {
+
+            const table =
+                $("assessmentTable");
+
+            table.innerHTML = `
+                <tr>
+                    <td colspan="8" class="loading-cell">
+                        Loading assessments...
+                    </td>
+                </tr>
+            `;
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        `${API_BASE}/admin/assessments`
+                    );
+
+                const data =
+                    await response.json();
+
+
+                if (!data.success) {
+                    throw new Error(
+                        "Unable to load assessments"
+                    );
+                }
+
+
+                allAssessments =
+                    data.assessments || [];
+
+
+                renderTable(allAssessments);
+
+
+            } catch (error) {
+
+                console.error(
+                    "Assessment error:",
+                    error
+                );
+
+                table.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="empty-cell">
+                            Unable to load assessments.
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+
+        /* =================================================
+           RENDER TABLE
+        ================================================= */
+
+        function renderTable(items) {
+
+            const table =
+                $("assessmentTable");
+
+
+            if (!items.length) {
+
+                table.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="empty-cell">
+                            No assessments found.
+                        </td>
+                    </tr>
+                `;
+
+                return;
+            }
+
+
+            table.innerHTML = items.map(item => {
+
+                const scoreClass =
+                    item.score >= 80
+                        ? "score-high"
+                        : item.score >= 60
+                            ? "score-medium"
+                            : "score-low";
+
+
+                const statusClass =
+                    item.score >= 80
+                        ? "status-high"
+                        : item.score >= 60
+                            ? "status-medium"
+                            : "status-low";
+
+
+                return `
+                    <tr>
+
+                        <td>
+                            <strong>
+                                CF-${String(item.id).padStart(5, "0")}
+                            </strong>
+                        </td>
+
+                        <td>
+                            <div class="farmer-cell">
+                                <div class="farmer-avatar">
+                                    ${escapeHTML(
+                                        (item.farmerName || "F")
+                                            .charAt(0)
+                                            .toUpperCase()
+                                    )}
+                                </div>
+
+                                <span>
+                                    ${escapeHTML(item.farmerName)}
+                                </span>
+                            </div>
+                        </td>
+
+                        <td>
+                            ${escapeHTML(item.landArea)} acre
+                        </td>
+
+                        <td>
+                            ${escapeHTML(item.mainCrop)}
+                        </td>
+
+                        <td>
+                            <span class="score-badge ${scoreClass}">
+                                ${item.score}/100
+                            </span>
+                        </td>
+
+                        <td>
+                            <span class="status-badge ${statusClass}">
+                                ${escapeHTML(item.status)}
+                            </span>
+                        </td>
+
+                        <td>
+                            ${formatDate(item.createdAt)}
+                        </td>
+
+                        <td>
+                            <button
+                                class="view-btn"
+                                onclick="viewAssessment(${item.id})"
+                            >
+                                View
+                            </button>
+
+                            <button
+                                class="delete-btn"
+                                onclick="deleteAssessment(${item.id})"
+                            >
+                                Delete
+                            </button>
+                        </td>
+
+                    </tr>
+                `;
+
+            }).join("");
+        }
+
+
+        /* =================================================
+           VIEW ASSESSMENT
+        ================================================= */
+
+        async function viewAssessment(id) {
+
+            const modal =
+                $("detailsModal");
+
+            const content =
+                $("modalContent");
+
+
+            modal.classList.add("show");
+
+            modal.setAttribute(
+                "aria-hidden",
+                "false"
+            );
+
+
+            content.innerHTML =
+                `<div class="modal-loading">
+                    Loading assessment...
+                </div>`;
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        `${API_BASE}/assessment/${id}`
+                    );
+
+                const data =
+                    await response.json();
+
+
+                if (!data.success) {
+                    throw new Error(
+                        data.message
+                    );
+                }
+
+
+                const item =
+                    data.assessment;
+
+
+                $("modalTitle").textContent =
+                    item.farmerName;
+
+
+                content.innerHTML = `
+
+                    <div class="detail-score">
+
+                        <div class="detail-score-circle">
+                            ${item.score}
+                        </div>
+
+                        <div>
+                            <span>Carbon Readiness Score</span>
+
+                            <strong>
+                                ${escapeHTML(item.status)}
+                            </strong>
+                        </div>
+
+                    </div>
+
+
+                    <div class="detail-grid">
+
+                        <div class="detail-box">
+                            <span>Assessment ID</span>
+                            <strong>
+                                CF-${String(item.assessmentId)
+                                    .padStart(5, "0")}
+                            </strong>
+                        </div>
+
+
+                        <div class="detail-box">
+                            <span>Farmer Name</span>
+                            <strong>
+                                ${escapeHTML(item.farmerName)}
+                            </strong>
+                        </div>
+
+
+                        <div class="detail-box">
+                            <span>Land Area</span>
+                            <strong>
+                                ${escapeHTML(item.landArea)} acre
+                            </strong>
+                        </div>
+
+
+                        <div class="detail-box">
+                            <span>Main Crop</span>
+                            <strong>
+                                ${escapeHTML(item.mainCrop)}
+                            </strong>
+                        </div>
+
+
+                        <div class="detail-box">
+                            <span>Farming Practice</span>
+                            <strong>
+                                ${escapeHTML(item.practice)}
+                            </strong>
+                        </div>
+
+
+                        <div class="detail-box">
+                            <span>Documents</span>
+                            <strong>
+                                ${escapeHTML(item.documents)}
+                            </strong>
+                        </div>
+
+                    </div>
+
+
+                    <div class="detail-summary">
+
+                        <span>Assessment Summary</span>
+
+                        <p>
+                            ${escapeHTML(item.summary)}
+                        </p>
+
+                    </div>
+
+
+                    <div class="detail-date">
+
+                        Assessment Date:
+                        <strong>
+                            ${formatDate(item.createdAt)}
+                        </strong>
+
+                    </div>
+                `;
+
+
+            } catch (error) {
+
+                content.innerHTML = `
+                    <div class="modal-error">
+                        Unable to load assessment.
+                    </div>
+                `;
+            }
+        }
+
+
+        /* =================================================
+           DELETE ASSESSMENT
+        ================================================= */
+
+        async function deleteAssessment(id) {
+
+            const confirmed =
+                confirm(
+                    "Are you sure you want to delete this assessment?"
+                );
+
+
+            if (!confirmed) return;
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        `${API_BASE}/admin/assessment/${id}`,
+                        {
+                            method: "DELETE"
+                        }
+                    );
+
+
+                const data =
+                    await response.json();
+
+
+                if (!data.success) {
+
+                    alert(
+                        data.message ||
+                        "Unable to delete assessment."
+                    );
+
+                    return;
+                }
+
+
+                await loadStats();
+
+                await loadAssessments();
+
+
+            } catch (error) {
+
+                alert(
+                    "Server error. Please try again."
+                );
+            }
+        }
+
+
+        /* =================================================
+           SEARCH
+        ================================================= */
+
+        $("searchInput")
+            .addEventListener("input", function () {
+
+                const search =
+                    this.value
+                        .toLowerCase()
+                        .trim();
+
+
+                if (!search) {
+
+                    renderTable(
+                        allAssessments
+                    );
+
+                    return;
+                }
+
+
+                const filtered =
+                    allAssessments.filter(item => {
+
+                        return (
+                            String(item.id)
+                                .toLowerCase()
+                                .includes(search) ||
+
+                            String(item.farmerName)
+                                .toLowerCase()
+                                .includes(search) ||
+
+                            String(item.mainCrop)
+                                .toLowerCase()
+                                .includes(search) ||
+
+                            String(item.status)
+                                .toLowerCase()
+                                .includes(search)
+                        );
+                    });
+
+
+                renderTable(filtered);
+            });
+
+
+        /* =================================================
+           REFRESH
+        ================================================= */
+
+        async function refreshDashboard() {
+
+            await Promise.all([
+                loadStats(),
+                loadAssessments()
+            ]);
+        }
+
+
+        $("refreshBtn")
+            .addEventListener(
+                "click",
+                refreshDashboard
+            );
+
+
+        $("refreshTableBtn")
+            .addEventListener(
+                "click",
+                refreshDashboard
+            );
+
+
+        /* =================================================
+           MODAL CLOSE
+        ================================================= */
+
+        function closeModal() {
+
+            $("detailsModal")
+                .classList.remove("show");
+
+            $("detailsModal")
+                .setAttribute(
+                    "aria-hidden",
+                    "true"
+                );
+        }
+
+
+        $("modalClose")
+            .addEventListener(
+                "click",
+                closeModal
+            );
+
+
+        $("modalOverlay")
+            .addEventListener(
+                "click",
+                closeModal
+            );
+
+
+        document.addEventListener(
+            "keydown",
+            event => {
+
+                if (
+                    event.key === "Escape"
+                ) {
+                    closeModal();
+                }
+            }
+        );
+
+
+        /* =================================================
+           INITIAL LOAD
+        ================================================= */
+
+        refreshDashboard();
+
+    </script>
+
+</body>
+</html>
